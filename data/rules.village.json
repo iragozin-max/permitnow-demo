@@ -1,0 +1,38 @@
+{
+  "rules": {
+    "shed": [
+      "Sheds are accessory structures and must meet accessory setbacks; front yard placement is not allowed.",
+      "Typical residential side/rear setbacks ≥ 5 ft; confirm parcel specifics in Zoning Map.",
+      "Height and total accessory area limits apply per Chapter 19 (Accessory Uses)."
+    ],
+    "kitchen": [
+      "Structural changes or enlarged window openings require building review.",
+      "Electrical additions require compliance with current code; include in valuation unless trade fees are published separately.",
+      "New water lines/fixtures require plumbing review; include in valuation unless trade fees are published separately."
+    ],
+    "basement": [
+      "Egress is required for any new sleeping room; smoke/CO detectors must meet current code.",
+      "If HVAC ducts/vents are added or modified, an HVAC/Mechanical permit is required."
+    ],
+    "windows": [
+      "New or enlarged openings require building review; energy code and egress may apply for bedrooms."
+    ],
+    "fence": [
+      "Height limits and vision triangles apply; corner lots have special rules. Confirm setbacks in zoning."
+    ],
+    "deck": [
+      "Decks are residential additions/alterations for valuation; plan exam applies. Guard/handrail requirements per code."
+    ],
+    "demo": [
+      "Razing/interior demo is permitted; fee is minimum plus $/sqft.",
+      "Utility disconnects and disposal requirements apply."
+    ],
+    "move": [
+      "Moving a structure across public ways requires special permitting and fees; route coordination required."
+    ]
+  },
+  "citations": {
+    "fees": "Village of Grafton Schedule of Permit Fees (effective 1/1/2025)",
+    "zoning": "Village of Grafton Zoning Ordinance – Chapter 19"
+  }
+}
