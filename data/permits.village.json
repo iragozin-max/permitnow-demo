@@ -1,0 +1,37 @@
+{
+  "permits": {
+    "building_alteration": {
+      "name": "Building Permit – Residential Alteration",
+      "triggers": ["kitchen", "basement", "windows", "deck", "fence", "interior_wall", "demo", "move_structure"],
+      "inspections": ["Framing (if applicable)", "Final building inspection"],
+      "fee_ref": "building.res_add_alt_deck_pool"
+    },
+    "building_shed_le_150": {
+      "name": "Building Permit – Accessory (≤150 sq ft)",
+      "triggers": ["shed_small"],
+      "inspections": ["Final building inspection"],
+      "fee_ref": "building.utility_accessory_shed_le_150"
+    },
+    "plan_exam_alteration": {
+      "name": "Plan Examination – Residential Alteration",
+      "inspections": [],
+      "fee_ref": "building.plan_exam.residential.alteration"
+    },
+    "plan_exam_deck_pool": {
+      "name": "Plan Examination – Deck/Pool",
+      "inspections": [],
+      "fee_ref": "building.plan_exam.residential.deck_pool"
+    },
+    "erosion_res_alt": {
+      "name": "Erosion Control – Residential Addition/Alteration",
+      "inspections": [],
+      "fee_ref": "building.erosion_control.res_additions_alterations"
+    },
+    "hvac_mechanical": {
+      "name": "HVAC/Mechanical Permit",
+      "triggers": ["hvac_new", "hvac_modify", "ductwork"],
+      "inspections": ["HVAC rough/final"],
+      "fee_ref": "hvac"
+    }
+  }
+}
