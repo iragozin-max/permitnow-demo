@@ -1,0 +1,28 @@
+{
+  "forms": {
+    "building_alteration": {
+      "label": "Building Permit Application – Residential Alteration",
+      "url": ""
+    },
+    "building_shed_le_150": {
+      "label": "Building Permit – Accessory Structure ≤150 sq ft",
+      "url": ""
+    },
+    "plan_exam_alteration": {
+      "label": "Plan Examination – Residential Alteration",
+      "url": ""
+    },
+    "plan_exam_deck_pool": {
+      "label": "Plan Examination – Deck/Pool",
+      "url": ""
+    },
+    "erosion_res_alt": {
+      "label": "Erosion Control – Residential Addition/Alteration",
+      "url": ""
+    },
+    "hvac_mechanical": {
+      "label": "HVAC/Mechanical Permit Application",
+      "url": ""
+    }
+  }
+}
