@@ -1,1 +1,52 @@
+{
+  "meta": {
+    "name": "Village of Grafton Fee Schedule",
+    "version": "2025-01-01",
+    "currency": "USD",
+    "notes": "Rates summarized from Village schedule. Confirm final amounts with Building Inspection."
+  },
+  "minimum_fee": 60,
+  "reinspection_fee": 75,
+
+  "building": {
+    "res_add_alt_deck_pool": { "type": "valuation_pct_per_thousand", "rate_per_1000": 13.50 },
+    "utility_accessory_shed_le_150": { "type": "flat_plus", "amount": 50, "plan_review": 25 },
+    "demolition": { "type": "min_plus_sqft", "min": 95, "per_sqft": 0.12 },
+    "moving_structure": { "type": "min_plus_sqft", "min": 500, "per_sqft": 0.12 },
+    "plan_exam": {
+      "residential": {
+        "new": 275,
+        "addition": 110,
+        "alteration": 65,
+        "accessory_gt_150": 75,
+        "deck_pool": 60
+      }
+    },
+    "erosion_control": {
+      "res_new": 150,
+      "res_additions_alterations": 60,
+      "comm_new": 250,
+      "comm_additions_alterations": 100
+    }
+  },
+
+  "hvac": {
+    "heating_unit_base_150k_btu": 60,
+    "heating_increment_per_50k_over_150k": 20,
+    "ac_unit_base_up_to_3_tons": 60,
+    "ac_increment_per_ton_over_3": 20,
+    "distribution_per_100sqft_conditioned": 2.20,
+    "distribution_minimum": 60
+  },
+
+  "electrical": {
+    "mode": "valuation_or_trade_missing",
+    "note": "Village schedule does not list per-device trade fees; include within valuation unless Village publishes a separate trade fee sheet."
+  },
+
+  "plumbing": {
+    "mode": "valuation_or_trade_missing",
+    "note": "Village schedule does not list per-fixture trade fees; include within valuation unless Village publishes a separate trade fee sheet."
+  }
+}
 
