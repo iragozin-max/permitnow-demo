@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PermitNow – Grafton Assistant (Demo)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root{--bg:#f7f9fb;--card:#fff;--border:#e5e9f0;--ink:#0f172a;--muted:#475569;--link:#1f4ed8}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .wrap{max-width:900px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .title{font-weight:700;font-size:20px} .sub{color:var(--muted);font-size:14px}
+    .examples{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0 0;padding:0;list-style:none}
+    .chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 12px;cursor:pointer}
+    .log{background:var(--card);border:1px solid var(--border);border-radius:12px;min-height:220px;max-height:420px;overflow:auto;padding:12px;margin-top:12px}
+    .msg{display:flex;gap:10px;margin:10px 0}.bubble{padding:10px 12px;border-radius:12px;max-width:80%}
+    .me .bubble{background:#eaf2ff}.bot .bubble{background:#f2f7f6}
+    .row{display:flex;gap:8px;margin-top:8px}.input{flex:1;border:1px solid var(--border);border-radius:10px;padding:10px}
+    .btn{border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;background:#fff}
+    .btn.primary{background:var(--link);color:#fff;border:none}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f7fafc;border:1px solid var(--border);padding:8px;border-radius:8px;display:inline-block}
+    footer{margin:16px 0;text-align:center;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="brand">
+        <div>
+          <div class="title">PermitNow</div>
+          <div class="sub">Village of Grafton – Zoning & Permit Assistant (Demo)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <p style="margin:0 0 6px 0;font-weight:600">Ask a zoning question in plain English. Get requirements, fees, and a printable summary.</p>
+      <p style="margin:0 0 6px 0;color:var(--muted)">Demo supports: <b>shed</b> and <b>basement remodel</b>. Try:</p>
+      <ul class="examples">
+        <li><button class="chip ex" data-text="Can I build a shed in my backyard at 1800 Falls Rd?">Can I build a shed…</button></li>
+        <li><button class="chip ex" data-text="I want to refinish my basement. It’s 850 sqft. What permits do I need, and what’s it going to cost?">Basement remodel…</button></li>
+      </ul>
+
+      <div id="log" class="log" aria-live="polite"></div>
+
+      <div class="row">
+        <input id="q" class="input" placeholder="Type your question…" />
+        <button id="ask" class="btn primary">Ask</button>
+      </div>
+
+      <div class="row" style="align-items:center;flex-wrap:wrap">
+        <button id="pdf" class="btn" disabled>Download PDF Summary</button>
+        <button id="email" class="btn" disabled>Email me this PDF</button>
+        <input id="addr" type="email" class="input" style="min-width:260px;max-width:320px" placeholder="you@example.com" />
+      </div>
+    </div>
+
+    <footer>Brought to you by PermitNow · Demo only — confirm with the Building Inspector.</footer>
+  </div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const log = $('#log'), q = $('#q'), ask = $('#ask'), pdf = $('#pdf'), email = $('#email'), addr = $('#addr');
+    let last = null;
+
+    function add(text, who='bot'){
+      const wrap = document.createElement('div'); wrap.className = 'msg '+who;
+      const b = document.createElement('div'); b.className = 'bubble'; b.innerHTML = text;
+      wrap.appendChild(b); log.appendChild(wrap); log.scrollTop = log.scrollHeight;
+    }
+    function canned(t){
+      t = t.toLowerCase();
+      if (t.includes('shed')) return {
+        address:'1800 Falls Rd, Grafton, WI 53024', zoning:'R-3 (simulated)',
+        project:'Detached accessory structure (shed)', allowed:'Yes — permitted accessory use subject to setbacks and size limits.',
+        rules:['Rear/side setbacks: typically ≥ 5 ft from lot lines (confirm parcel specifics).','Max height & total accessory area limits apply (Chapter 19 – Accessory Structures).','No placement within the front yard setback.'],
+        permits:['Building Permit (required)'],
+        checklist:['Simple site sketch with distances to property lines','Dimensions (L × W × H) of shed','Contractor info (or homeowner if DIY)'],
+        fees:['Building permit: local base + per-sqft (varies by schedule)'],
+        cites:['Village of Grafton Zoning Ordinance – Chapter 19 (Articles II–III, Accessory Uses).']
+      };
+      if (t.includes('basement') || t.includes('finish') || t.includes('850')) return {
+        address:'1800 Falls Rd, Grafton, WI 53024', zoning:'R-3 (simulated)',
+        project:'Basement remodel (850 sqft)', allowed:'Yes — interior alteration permitted.',
+        rules:['Work must comply with building, electrical, plumbing, HVAC codes.','Egress required for any new sleeping rooms.','Smoke/CO detectors must meet current code.'],
+        permits:['Building Permit (required)','Electrical Permit (if adding/altering circuits/fixtures)','Plumbing Permit (if adding bath/laundry/wet bar)','HVAC Permit (if adding/modifying ducts/vents)'],
+        checklist:['Floor plan sketch with room uses & dimensions','Scope of work (materials, insulation, finishes)','Contractor(s) information (or owner)'],
+        fees:['Building permit example: base + $0.30/sqft ≈ $305','Electrical/HVAC/Plumbing: ~$60–$150 each depending on scope'],
+        cites:['Village of Grafton Zoning Ordinance – Chapter 19 (Residential interior improvements).','Wisconsin UDC – egress & life-safety provisions.']
+      };
+      return {address:'(need address)', zoning:'Unknown', project:'General inquiry', allowed:'Need more details.',
+        rules:['Please include your address and a short project description.'], permits:[], checklist:[], fees:[], cites:['Chapter 19 – Zoning Ordinance (Village of Grafton).']};
+    }
+    function render(s){
+      return `<div class="mono">
+      <b>Address:</b> ${s.address}<br/><b>Zoning:</b> ${s.zoning}<br/><b>Project:</b> ${s.project}<br/><b>Allowed:</b> ${s.allowed}<br/>
+      <b>Key Rules:</b><ul>${s.rules.map(r=>`<li>${r}</li>`).join('')}</ul>
+      <b>Permits Required:</b><ul>${s.permits.map(p=>`<li>${p}</li>`).join('')}</ul>
+      <b>Checklist:</b><ul>${s.checklist.map(c=>`<li>${c}</li>`).join('')}</ul>
+      <b>Estimated Fees:</b><ul>${s.fees.map(f=>`<li>${f}</li>`).join('')}</ul>
+      <b>Citations:</b><ul>${s.cites.map(c=>`<li>${c}</li>`).join('')}</ul></div>`;
+    }
+    function toPDF(s){
+      const { jsPDF } = window.jspdf; const doc = new jsPDF({unit:'pt',format:'letter'});
+      const M=48,W=612-2*M; let y=M; const line=(t,b=false)=>{doc.setFont('helvetica',b?'bold':'normal'); doc.splitTextToSize(t,W).forEach(v=>{doc.text(v,M,y);y+=18}); y+=2;};
+      line('Village of Grafton – Zoning & Permit Summary',1); line('Prepared via PermitNow (Demo)'); y+=6; doc.setLineWidth(.5); doc.line(M,y,M+W,y); y+=14;
+      line(`Address: ${s.address}`,1); line(`Zoning: ${s.zoning}`); line(`Project: ${s.project}`); line(`Allowed: ${s.allowed}`); y+=6;
+      line('Key Rules',1); s.rules.forEach(r=>line('• '+r)); y+=6;
+      if(s.permits.length){line('Permits Required',1); s.permits.forEach(p=>line('• '+p)); y+=6;}
+      if(s.checklist.length){line('Checklist',1); s.checklist.forEach(c=>line('• '+c)); y+=6;}
+      if(s.fees.length){line('Estimated Fees',1); s.fees.forEach(f=>line('• '+f)); y+=6;}
+      if(s.cites.length){line('Citations',1); s.cites.forEach(c=>line('• '+c)); y+=6;}
+      y=760; doc.setLineWidth(.5); doc.line(M,y,M+W,y); y+=16; line('Brought to you by PermitNow',1); return doc;
+    }
+    function askNow(){
+      const text = q.value.trim(); if(!text) return; add(text,'me'); q.value='';
+      const s = canned(text); last = s; setTimeout(()=>add(render(s),'bot'),120);
+      pdf.disabled=false; email.disabled=false;
+    }
+    document.addEventListener('click', e => { if (e.target && e.target.classList.contains('ex')) { q.value=e.target.dataset.text; askNow(); }});
+    ask.addEventListener('click', askNow);
+    q.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); askNow(); }});
+    pdf.addEventListener('click', ()=>{ if(!last) return; toPDF(last).save('PermitNow-Grafton-Summary.pdf'); });
+    email.addEventListener('click', ()=>{ if(!last) return; const a=addr.value.trim(); if(!a){alert('Enter an email address first.'); return;} toPDF(last).save('PermitNow-Grafton-Summary.pdf'); alert('Demo: would email to '+a); });
+    add('Hi! Ask a zoning question for Grafton. Example: <em>Can I build a shed in my backyard at 1800 Falls Rd?</em>');
+  </script>
+</body>
+</html>
