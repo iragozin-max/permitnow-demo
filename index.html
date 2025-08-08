@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PermitNow – Grafton Assistant (Demo)</title>
+  <title>PermitNow – Village of Grafton (Demo)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
@@ -24,6 +24,7 @@
     .btn[disabled]{opacity:.5;cursor:not-allowed}
     .mono{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f7fafc;border:1px solid var(--border);padding:8px;border-radius:8px;display:inline-block}
     footer{margin:16px 0;text-align:center;color:var(--muted);font-size:13px}
+    .chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:8px 12px;cursor:pointer}
   </style>
 </head>
 <body>
@@ -38,25 +39,23 @@
     </div>
 
     <div class="card" style="margin-top:12px">
-      <p style="margin:0 0 6px 0;font-weight:600">Ask a zoning/permit question in plain English. Get required permits, fees, and a printable summary.</p>
-      <p style="margin:0 0 6px 0;color:#475569">Examples to try:</p>
+      <p style="margin:0 0 6px 0;font-weight:600">Ask a permit question. I’ll compute **Village** fees using the official schedule and show citations.</p>
       <ul style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0 0;padding:0;list-style:none">
-        <li><button class="chip" data-text="I want to remodel my kitchen at 1800 Falls Rd, Grafton WI 53024. 8 new recessed lights, 2 new windows, and a water line to the fridge. What permits do I need and how much will it cost?">Kitchen remodel (lights + windows + water line)</button></li>
-        <li><button class="chip" data-text="I want to refinish my basement. It’s 850 sqft. What permits do I need, and what’s it going to cost?">Basement remodel (850 sqft)</button></li>
-        <li><button class="chip" data-text="Can I build a shed in my backyard at 1800 Falls Rd?">Shed</button></li>
+        <li><button class="chip ex" data-text="I want to remodel my kitchen at 1800 Falls Rd, Grafton WI 53024. 8 new recessed lights, 2 new windows, and a water line to the fridge. Valuation is $28,000. What permits do I need and how much will it cost?">Kitchen w/ valuation</button></li>
+        <li><button class="chip ex" data-text="I want to refinish my basement. It’s 850 sqft. Valuation $22,000. What permits do I need and what’s it going to cost?">Basement w/ valuation</button></li>
+        <li><button class="chip ex" data-text="Can I build a 10×12 shed (120 sqft) in my backyard at 1800 Falls Rd?">Shed ≤150 sqft</button></li>
       </ul>
 
       <div id="log" class="log" aria-live="polite"></div>
 
       <div class="row">
-        <input id="q" class="input" placeholder="Type your question…" />
+        <input id="q" class="input" placeholder="Type your question (include address + valuation if you know it)…" />
         <button id="ask" class="btn primary">Ask</button>
       </div>
 
       <div class="row" style="align-items:center;flex-wrap:wrap">
         <button id="pdf" class="btn" disabled>Download PDF Summary</button>
-        <button id="email" class="btn" disabled>Email me this PDF</button>
-        <input id="addr" type="email" class="input" style="min-width:260px;max-width:320px" placeholder="you@example.com" />
+        <input id="addr" type="email" class="input" style="min-width:260px;max-width:320px" placeholder="you@example.com (for future email feature)" />
       </div>
     </div>
 
@@ -64,235 +63,204 @@
   </div>
 
   <script>
-  // --- Local knowledge base (editable) ---
-  const KB = {
-    meta: { muni: "Village of Grafton, WI" },
-    defaults: {
-      building_permit: { name:"Building Permit", fee: { type:"sqft", base:50, per_sqft:0.30 } },
-      electrical_permit:{ name:"Electrical Permit", fee:{ type:"tier_by_count", tiers:[{max:6,fee:60},{max:12,fee:90},{max:9999,fee:120}] } },
-      plumbing_permit: { name:"Plumbing Permit",  fee:{ type:"per_fixture", per:25, min:60 } },
-      hvac_permit:     { name:"HVAC/Mechanical Permit", fee:{ type:"flat", amount:75 } },
-      window_permit_hint:{ name:"Building Permit (windows)", fee:{ type:"per_unit", per:40, min:80 } }
-    },
-    intents: [
-      {
-        id:"kitchen", synonyms:["kitchen remodel","remodel my kitchen","kitchen renovation"],
-        requires:["building_permit"], optional:["electrical_permit","plumbing_permit","hvac_permit"],
-        questions:[
-          {key:"elec_count", ask:"How many new electrical devices (recessed lights/outlets/circuits)?" },
-          {key:"plumbing_fixtures", ask:"How many new/relocated plumbing fixtures (sink, DW, fridge water line)?" },
-          {key:"windows", ask:"How many new or enlarged windows?" }
-        ],
-        rules:[
-          "Structural changes or window enlargements require building review.",
-          "Electrical additions require an electrical permit.",
-          "New water lines/fixtures require a plumbing permit.",
-          "HVAC permit is required if ducts/vents are added or modified."
-        ],
-        fee_logic:[
-          {ref:"building_permit", if:"always"},
-          {ref:"electrical_permit", if:"elec_count>0", count_key:"elec_count"},
-          {ref:"plumbing_permit", if:"plumbing_fixtures>0", count_key:"plumbing_fixtures"},
-          {ref:"window_permit_hint", if:"windows>0", count_key:"windows"}
-        ],
-        inspections:["Electrical rough/final (if applicable)","Plumbing rough/final (if applicable)","Final building inspection"]
-      },
-      {
-        id:"basement", synonyms:["basement remodel","finish basement","refinish basement","basement finishing"],
-        requires:["building_permit"], optional:["electrical_permit","plumbing_permit","hvac_permit"],
-        questions:[
-          {key:"sqft", ask:"What’s the finished square footage?" },
-          {key:"bedroom", ask:"Any new bedrooms/sleeping rooms (egress required)?" }
-        ],
-        rules:[
-          "Work must comply with building, electrical, plumbing, and HVAC codes.",
-          "Egress requirements apply for sleeping rooms per WI UDC.",
-          "Smoke/CO detectors must meet current code."
-        ],
-        fee_logic:[{ref:"building_permit", if:"always"}],
-        inspections:["Framing (if applicable)","Electrical rough/final","Plumbing rough/final","HVAC (if modified)","Final building inspection"]
-      },
-      {
-        id:"shed", synonyms:["shed","storage shed","detached shed"],
-        requires:["building_permit"],
-        questions:[],
-        rules:[
-          "Rear/side setbacks typically ≥ 5 ft from lot lines (confirm parcel specifics).",
-          "No placement within the front yard setback.",
-          "Height and total accessory area limits apply per Chapter 19 (Accessory Structures)."
-        ],
-        fee_logic:[{ref:"building_permit", if:"always"}],
-        inspections:["Final building inspection"]
+    const $ = s => document.querySelector(s);
+    const log = $('#log'), q = $('#q'), ask = $('#ask'), pdfBtn = $('#pdf');
+
+    let FEES=null, PERMITS=null, RULES=null, ADDRMAP=null, lastSummary=null;
+
+    // --- load data ---
+    async function loadData(){
+      const [fees, permits, rules, addrmap] = await Promise.all([
+        fetch('data/fees.village.json').then(r=>r.json()),
+        fetch('data/permits.village.json').then(r=>r.json()),
+        fetch('data/rules.village.json').then(r=>r.json()),
+        fetch('data/addresses.sample.json').then(r=>r.json()).catch(()=> ({}))
+      ]);
+      FEES=fees; PERMITS=permits; RULES=rules; ADDRMAP=addrmap||{};
+    }
+
+    function addMsg(text, who='bot'){
+      const wrap=document.createElement('div'); wrap.className='msg '+who;
+      const b=document.createElement('div'); b.className='bubble'; b.innerHTML=text;
+      wrap.appendChild(b); log.appendChild(wrap); log.scrollTop=log.scrollHeight;
+    }
+
+    function parseAddress(text){
+      const m = text.match(/\b(\d{2,6}\s+[A-Za-z0-9 .'-]+,\s*Grafton\s*WI[^,]*)/i);
+      return m ? m[1].trim() : null;
+    }
+    function parseValuation(text){
+      const m = text.match(/\$?\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)\s*(k|k\.)?\s*(valuation|value|budget|cost)/i)
+              || text.match(/valuation\s*\$?\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)/i)
+              || text.match(/\$?\s*([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)\s*(k|k\.)/i);
+      if(!m) return null;
+      let n = m[1].replace(/,/g,'')*1;
+      if (m[2] && m[2].toLowerCase().startsWith('k')) n = n*1000;
+      return isNaN(n)? null : n;
+    }
+    function extractNumbers(t){
+      const nums = { elec_count:0, plumbing_fixtures:0, windows:0, sqft:0 };
+      const n = x => isNaN(parseInt(x,10)) ? 0 : parseInt(x,10);
+      const lights = t.match(/(\d+)\s+(recessed|can)\s*lights?/); if(lights) nums.elec_count += n(lights[1]);
+      const outlets = t.match(/(\d+)\s*outlets?/); if(outlets) nums.elec_count += n(outlets[1]);
+      const circuits = t.match(/(\d+)\s*circuits?/); if(circuits) nums.elec_count += n(circuits[1]);
+      const wins = t.match(/(\d+)\s+(?:new|added|enlarged)\s+windows?/); if(wins) nums.windows = n(wins[1]);
+      const fix = t.match(/(\d+)\s+(fixtures?|sinks?|toilets?|faucets?)/); if(fix) nums.plumbing_fixtures = n(fix[1]);
+      if (t.includes('water line')) nums.plumbing_fixtures = Math.max(nums.plumbing_fixtures,1);
+      const sq = t.match(/(\d{2,5})\s*(sq\s*ft|sqft|square\s*feet)/); if(sq) nums.sqft = n(sq[1]);
+      return nums;
+    }
+    function detectIntents(text){
+      const t=text.toLowerCase(); const intents=[];
+      if (t.includes('kitchen')) intents.push('kitchen');
+      if (t.includes('basement')) intents.push('basement');
+      if (t.includes('shed')) intents.push('shed');
+      if (t.includes('deck')) intents.push('deck');
+      if (t.includes('fence')) intents.push('fence');
+      if (t.includes('window')) intents.push('windows');
+      if (t.includes('egress')) intents.push('windows');
+      if (t.includes('ev') && t.includes('charger')) intents.push('ev');
+      if (!intents.length) intents.push('kitchen'); // heuristic fallback
+      return [...new Set(intents)];
+    }
+
+    // --- fee helpers (Village) ---
+    function fee_val_pct_per_thousand(val, rate){ if(!val) return {amount:null, text:`$${rate}/$1,000 (need valuation)`}; const a=Math.max(0, (val/1000)*rate); return {amount:a, text:`$${rate}/$1,000 × $${val.toLocaleString()} = $${a.toFixed(2)}`}; }
+    function fee_min_plus_sqft(min, per_sqft, sqft){ if(!sqft) return {amount:min, text:`$${min} min + $${per_sqft}/sqft (need sqft)`}; const a=Math.max(min, min + sqft*per_sqft); return {amount:a, text:`$${min} min + $${per_sqft}×${sqft} sqft = $${a.toFixed(2)}`}; }
+    function fee_flat_plus(amount, plan){ return {amount:amount+plan, text:`$${amount} + plan exam $${plan}`}; }
+    function fee_hvac_distribution(sqft){ if(!sqft) return {amount:FEES.hvac.distribution_minimum, text:`HVAC distribution: $${FEES.hvac.distribution_minimum} min (need conditioned sqft)`}; const a=Math.max(FEES.hvac.distribution_minimum, (sqft/100)*FEES.hvac.distribution_per_100sqft_conditioned); return {amount:a, text:`HVAC distribution: $${FEES.hvac.distribution_per_100sqft_conditioned}/100sqft × ${sqft} = $${a.toFixed(2)}`}; }
+
+    function calcVillageFees(intents, nums, valuation, sqftConditioned){
+      const out = { lines:[], total:0, complete:true, citations:[
+        "Village of Grafton Schedule of Permit Fees (1/1/2025)"
+      ]};
+
+      // Building valuation-based (kitchen/basement/deck/windows treated as add/alt)
+      if (intents.some(i=>['kitchen','basement','deck','windows','fence'].includes(i))){
+        const f = fee_val_pct_per_thousand(valuation, FEES.building.res_add_alt_deck_pool.rate_per_1000);
+        out.lines.push(`Building (res. alteration): ${f.text}`);
+        if (f.amount!=null) out.total += f.amount; else out.complete=false;
+
+        // plan exam adders
+        if (intents.includes('deck')) out.lines.push(`Plan exam (deck/pool): $${FEES.building.plan_exam.residential.deck_pool}`), out.total += FEES.building.plan_exam.residential.deck_pool;
+        else out.lines.push(`Plan exam (alteration): $${FEES.building.plan_exam.residential.alteration}`), out.total += FEES.building.plan_exam.residential.alteration;
+
+        // erosion control (res. additions/alterations)
+        out.lines.push(`Erosion control (res. add/alt): $${FEES.building.erosion_control.res_additions_alterations}`); out.total += FEES.building.erosion_control.res_additions_alterations;
       }
-    ]
-  };
 
-  // --- Helpers ---
-  const $ = s => document.querySelector(s);
-  const log = $('#log'), q = $('#q'), ask = $('#ask'), pdfBtn = $('#pdf'), emailBtn = $('#email'), addr = $('#addr');
-  let lastSummary = null;
+      // Shed ≤150 sqft (flat + plan)
+      if (intents.includes('shed') && nums.sqft && nums.sqft <= 150){
+        const f = fee_flat_plus(FEES.building.utility_accessory_shed_le_150.amount, FEES.building.utility_accessory_shed_le_150.plan_review);
+        out.lines.push(`Accessory shed ≤150 sqft: ${f.text}`); out.total += f.amount;
+      }
 
-  function add(text, who='bot'){
-    const wrap = document.createElement('div'); wrap.className = 'msg '+who;
-    const b = document.createElement('div'); b.className = 'bubble'; b.innerHTML = text;
-    wrap.appendChild(b); log.appendChild(wrap); log.scrollTop = log.scrollHeight;
-  }
+      // Windows: already covered by valuation; still call out explicitly
+      if (intents.includes('windows') && nums.windows>0){
+        out.lines.push(`Windows: included in valuation; structural/enlarged openings require review.`);
+      }
 
-  function parseAddress(text){
-    const m = text.match(/\b(\d{2,6}\s+[A-Za-z0-9 .'-]+,\s*Grafton\s*WI[^,]*)/i);
-    return m ? m[1].trim() : null;
-  }
+      // HVAC notes: only if user mentions ducts/vents; demo adds distribution if sqftConditioned provided
+      if (intents.includes('kitchen') || intents.includes('basement')){
+        if (sqftConditioned){ const d = fee_hvac_distribution(sqftConditioned); out.lines.push(d.text); out.total += d.amount; }
+      }
 
-  function extractNumbers(t){
-    const nums = { elec_count:0, plumbing_fixtures:0, windows:0, sqft:0 };
-    const n = x => isNaN(parseInt(x,10)) ? 0 : parseInt(x,10);
-    const lights = t.match(/(\d+)\s+(recessed|can)\s*lights?/); if (lights) nums.elec_count += n(lights[1]);
-    const outlets = t.match(/(\d+)\s*outlets?/); if (outlets) nums.elec_count += n(outlets[1]);
-    const circuits = t.match(/(\d+)\s*circuits?/); if (circuits) nums.elec_count += n(circuits[1]);
-    const wins = t.match(/(\d+)\s+(?:new|added|enlarged)\s+windows?/); if (wins) nums.windows = n(wins[1]);
-    const fix = t.match(/(\d+)\s+(fixtures?|sinks?|toilets?|faucets?)/); if (fix) nums.plumbing_fixtures = n(fix[1]);
-    if (t.includes('water line')) nums.plumbing_fixtures = Math.max(nums.plumbing_fixtures,1);
-    const sq = t.match(/(\d{2,5})\s*(sq\s*ft|sqft|square\s*feet)/); if (sq) nums.sqft = n(sq[1]);
-    return nums;
-  }
+      // Minimum fee check (applies where line item would be lower; we’ll ensure final total respects minimums if nothing else applies)
+      if (out.total < FEES.minimum_fee){ out.lines.push(`Minimum fee applied: $${FEES.minimum_fee}`); out.total = FEES.minimum_fee; }
 
-  function detectIntents(text){
-    const t = text.toLowerCase();
-    const hits = KB.intents.filter(it => it.synonyms.some(s => t.includes(s)));
-    // if no explicit intent found, try heuristics
-    if (!hits.length){
-      if (t.includes('kitchen')) hits.push(KB.intents.find(i=>i.id==='kitchen'));
-      else if (t.includes('basement')) hits.push(KB.intents.find(i=>i.id==='basement'));
-      else if (t.includes('shed')) hits.push(KB.intents.find(i=>i.id==='shed'));
-    }
-    return hits.filter(Boolean);
-  }
-
-  function feeTextFromDefault(ref, numbers){
-    const d = KB.defaults[ref]; if (!d) return { amount:null, text:`${ref}: see schedule` };
-    const f = d.fee || {};
-    if (f.type==='flat') return { amount:f.amount, text:`${d.name}: $${f.amount} (est.)` };
-    if (f.type==='sqft'){
-      const sqft = numbers.sqft||0, base=f.base||0, per=f.per_sqft||0;
-      if (!sqft) return { amount:null, text:`${d.name}: base $${base} + $${per}/sqft (need sqft)` };
-      const amt = Math.round((base + sqft*per)*100)/100;
-      return { amount:amt, text:`${d.name}: $${amt} (base $${base} + $${per}/sqft × ${sqft})` };
-    }
-    if (f.type==='tier_by_count'){
-      const count = numbers.elec_count||0;
-      if (!count) return { amount:null, text:`${d.name}: tiered by device count (need count)` };
-      let fee=null; (f.tiers||[]).some(t=>{ if(count<=t.max){ fee=t.fee; return true } return false; });
-      return { amount:fee, text:`${d.name}: $${fee} (for ${count} devices)` };
-    }
-    if (f.type==='per_fixture'){
-      const c = numbers.plumbing_fixtures||0; const per=f.per||0, min=f.min||0;
-      if (!c) return { amount:null, text:`${d.name}: min $${min}, $${per}/fixture (need count)` };
-      const total = Math.max(min, c*per); return { amount:total, text:`${d.name}: $${total} (min $${min}, $${per}/fixture × ${c})` };
-    }
-    if (f.type==='per_unit'){
-      const c = numbers.windows||0; const per=f.per||0, min=f.min||0;
-      if (!c) return { amount:null, text:`${d.name}: min $${min}, $${per}/unit (need count)` };
-      const total = Math.max(min, c*per); return { amount:total, text:`${d.name}: $${total} (min $${min}, $${per}/unit × ${c})` };
-    }
-    return { amount:null, text:`${d.name}: see schedule` };
-  }
-
-  function estimate(intent, numbers){
-    const permits = (intent.requires||[]).map(k=>KB.defaults[k]);
-    const optional = (intent.optional||[]).map(k=>KB.defaults[k]);
-    const feeLines=[], inspections=intent.inspections||[];
-    let total=0, complete=true;
-
-    (intent.fee_logic||[]).forEach(part=>{
-      let include = part.if==='always';
-      if (part.if && part.if.includes('elec_count')) include = (numbers.elec_count||0)>0;
-      if (part.if && part.if.includes('plumbing_fixtures')) include = (numbers.plumbing_fixtures||0)>0;
-      if (part.if && part.if.includes('windows')) include = (numbers.windows||0)>0;
-      if (!include) return;
-      const f = feeTextFromDefault(part.ref, numbers);
-      feeLines.push(f.text);
-      if (f.amount!=null) total += f.amount; else complete=false;
-    });
-
-    return {
-      project: intent.id,
-      rules: intent.rules||[],
-      permits,
-      optionalPermits: optional,
-      inspections,
-      feeLines,
-      total: complete ? `$${total}` : `~$${total} + items needing details`,
-      haveAllNumbers: complete
-    };
-  }
-
-  function render(summary){
-    return `<div class="mono">
-      <b>Address:</b> ${summary.address}<br/>
-      <b>Zoning:</b> R-3 (simulated)<br/>
-      <b>Project(s):</b> ${summary.projects.join(', ')}<br/>
-      <b>Permits Required:</b><ul>${summary.permits.map(p=>`<li>${p}</li>`).join('')}</ul>
-      ${summary.mayNeed.length ? `<b>May Also Need:</b><ul>${summary.mayNeed.map(p=>`<li>${p}</li>`).join('')}</ul>`:''}
-      <b>Rules & Notes:</b><ul>${summary.rules.map(r=>`<li>${r}</li>`).join('')}</ul>
-      <b>Estimated Fees:</b><ul>${summary.fees.map(f=>`<li>${f}</li>`).join('')}</ul>
-      <b>Estimated Total:</b> ${summary.total}<br/>
-      <b>Inspections:</b><ul>${summary.inspections.map(i=>`<li>${i}</li>`).join('')}</ul>
-      <b>Citations:</b><ul><li>Village of Grafton Zoning Ordinance – Chapter 19</li><li>Wisconsin UDC</li></ul>
-    </div>`;
-  }
-
-  function toPDF(summary){
-    const { jsPDF } = window.jspdf; const doc = new jsPDF({unit:'pt',format:'letter'});
-    const M=48,W=612-2*M; let y=M; const line=(t,b=false)=>{doc.setFont('helvetica',b?'bold':'normal'); doc.splitTextToSize(t,W).forEach(v=>{doc.text(v,M,y);y+=18}); y+=2;};
-    line('Village of Grafton – Zoning & Permit Summary',1); line('Prepared via PermitNow (Demo)'); y+=6; doc.setLineWidth(.5); doc.line(M,y,M+W,y); y+=14;
-    line(`Address: ${summary.address}`,1); line(`Zoning: R-3 (simulated)`); line(`Projects: ${summary.projects.join(', ')}`); y+=6;
-    line('Permits Required',1); summary.permits.forEach(p=>line('• '+p)); y+=6;
-    if(summary.mayNeed.length){ line('May Also Need',1); summary.mayNeed.forEach(p=>line('• '+p)); y+=6; }
-    line('Rules & Notes',1); summary.rules.forEach(r=>line('• '+r)); y+=6;
-    line('Estimated Fees',1); summary.fees.forEach(f=>line('• '+f)); line('Estimated Total: '+summary.total,1); y+=6;
-    line('Inspections',1); summary.inspections.forEach(i=>line('• '+i)); y+=6;
-    line('Citations',1); line('• Village of Grafton Zoning Ordinance – Chapter 19'); line('• Wisconsin UDC');
-    y=760; doc.setLineWidth(.5); doc.line(M,y,M+W,y); y+=16; line('Brought to you by PermitNow',1);
-    return doc;
-  }
-
-  function respond(text){
-    const address = parseAddress(text) || 'unknown (please include address)';
-    const nums = extractNumbers(text.toLowerCase());
-    const intents = detectIntents(text);
-    if (!intents.length){
-      add("I didn't recognize the project type. Try phrasing like: 'kitchen remodel with 8 recessed lights, 2 new windows, and a fridge water line.'",'bot');
-      return;
+      return out;
     }
 
-    // Combine multiple intents if the sentence mentions them
-    const results = intents.map(it => estimate(it, nums));
-    const projects = results.map(r=>r.project);
-    const permits = [...new Set(results.flatMap(r=>r.permits.map(p=>p.name)))];
-    const mayNeed = [...new Set(results.flatMap(r=>r.optionalPermits.map(p=>p.name)))];
-    const rules = [...new Set(results.flatMap(r=>r.rules))];
-    const inspections = [...new Set(results.flatMap(r=>r.inspections))];
-    const fees = results.flatMap(r=>r.feeLines);
-    const totalText = results.every(r=>r.haveAllNumbers) ? `$${results.reduce((a,r)=>a+(+r.total.replace('$','')||0),0)}` : 'Depends on details (see items above)';
+    function combinePermits(intents){
+      const need = [];
+      const may = [];
+      if (intents.includes('kitchen')){ need.push('Building Permit – Residential Alteration'); may.push('HVAC/Mechanical Permit'); }
+      if (intents.includes('basement')){ need.push('Building Permit – Residential Alteration'); may.push('HVAC/Mechanical Permit'); }
+      if (intents.includes('deck')){ need.push('Building Permit – Residential Alteration'); }
+      if (intents.includes('windows')){ need.push('Building Permit – Residential Alteration'); }
+      if (intents.includes('shed')){ need.push('Building Permit – Accessory (≤150 sq ft)'); }
+      if (intents.includes('fence')){ need.push('Building/Zoning Review (fence)'); }
+      return { need:[...new Set(need)], may:[...new Set(may)] };
+    }
 
-    const summary = { address, projects, permits, mayNeed, rules, inspections, fees, total: totalText };
-    lastSummary = summary;
-    add(render(summary),'bot');
-    pdfBtn.disabled=false; emailBtn.disabled=false;
-  }
+    function summarize(address, zoning, intents, nums, valuation){
+      const hvacSqft = (intents.includes('basement') ? nums.sqft : 0);
+      const feeBundle = calcVillageFees(intents, nums, valuation, hvacSqft);
+      const { need, may } = combinePermits(intents);
 
-  function askNow(){
-    const text = q.value.trim(); if(!text) return;
-    add(text,'me'); q.value=''; respond(text);
-  }
+      const rules = new Set();
+      intents.forEach(i => (RULES.rules[i]||[]).forEach(r => rules.add(r)));
 
-  document.addEventListener('click', e => { if (e.target && e.target.classList.contains('chip')) { q.value=e.target.dataset.text; askNow(); }});
-  ask.addEventListener('click', askNow);
-  q.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); askNow(); }});
-  pdfBtn.addEventListener('click', ()=>{ if(!lastSummary) return; toPDF(lastSummary).save('PermitNow-Grafton-Summary.pdf'); });
-  emailBtn.addEventListener('click', ()=>{ if(!lastSummary) return; const a=addr.value.trim(); if(!a){alert('Enter an email address first.'); return;} toPDF(lastSummary).save('PermitNow-Grafton-Summary.pdf'); alert('Demo: would email to '+a); });
+      const summary = {
+        address, zoning, projects:intents,
+        permits:need, mayNeed:may,
+        rules:[...rules],
+        fees:feeBundle.lines,
+        total: feeBundle.complete ? `$${feeBundle.total.toFixed(2)}` : `Depends on details`,
+        inspections: ["Final building inspection"],
+        citations: [RULES.citations.fees, RULES.citations.zoning]
+      };
+      return summary;
+    }
 
-  add('Hi! Ask a zoning/permit question for Grafton. Example: <em>I want to remodel my kitchen…</em>');
+    function render(summary){
+      return `<div class="mono">
+        <b>Address:</b> ${summary.address}<br/>
+        <b>Zoning:</b> ${summary.zoning || 'Unknown'}<br/>
+        <b>Project(s):</b> ${summary.projects.join(', ')}<br/>
+        <b>Permits Required:</b><ul>${summary.permits.map(p=>`<li>${p}</li>`).join('')}</ul>
+        ${summary.mayNeed.length? `<b>May Also Need:</b><ul>${summary.mayNeed.map(p=>`<li>${p}</li>`).join('')}</ul>`:''}
+        <b>Rules & Notes:</b><ul>${summary.rules.map(r=>`<li>${r}</li>`).join('')}</ul>
+        <b>Estimated Fees:</b><ul>${summary.fees.map(f=>`<li>${f}</li>`).join('')}</ul>
+        <b>Estimated Total:</b> ${summary.total}<br/>
+        <b>Inspections:</b><ul>${summary.inspections.map(i=>`<li>${i}</li>`).join('')}</ul>
+        <b>Citations:</b><ul>${summary.citations.map(c=>`<li>${c}</li>`).join('')}</ul>
+      </div>`;
+    }
+
+    function toPDF(summary){
+      const { jsPDF } = window.jspdf; const doc = new jsPDF({unit:'pt',format:'letter'});
+      const M=48,W=612-2*M; let y=M; const line=(t,b=false)=>{doc.setFont('helvetica',b?'bold':'normal'); doc.splitTextToSize(t,W).forEach(v=>{doc.text(v,M,y);y+=18}); y+=2;};
+      line('Village of Grafton – Zoning & Permit Summary',1); line('Prepared via PermitNow (Demo)'); y+=6; doc.setLineWidth(.5); doc.line(M,y,M+W,y); y+=14;
+      line(`Address: ${summary.address}`,1); line(`Zoning: ${summary.zoning||'Unknown'}`); line(`Projects: ${summary.projects.join(', ')}`); y+=6;
+      line('Permits Required',1); summary.permits.forEach(p=>line('• '+p)); y+=6;
+      if(summary.mayNeed.length){ line('May Also Need',1); summary.mayNeed.forEach(p=>line('• '+p)); y+=6; }
+      line('Rules & Notes',1); summary.rules.forEach(r=>line('• '+r)); y+=6;
+      line('Estimated Fees',1); summary.fees.forEach(f=>line('• '+f)); line('Estimated Total: '+summary.total,1); y+=6;
+      line('Inspections',1); summary.inspections.forEach(i=>line('• '+i)); y+=6;
+      line('Citations',1); summary.citations.forEach(c=>line('• '+c));
+      y=760; doc.setLineWidth(.5); doc.line(M,y,M+W,y); y+=16; line('Brought to you by PermitNow',1);
+      return doc;
+    }
+
+    function respond(text){
+      const address = parseAddress(text) || '(please include address)';
+      const zoning = ADDRMAP[address]?.zoning || 'R-district (assumed for demo)';
+      const valuation = parseValuation(text) || null;
+      const nums = extractNumbers(text.toLowerCase());
+      const intents = detectIntents(text);
+
+      // prompt if valuation needed
+      if (intents.some(i=>['kitchen','basement','deck','windows','fence'].includes(i)) && !valuation){
+        addMsg("I need the **project valuation** (materials + labor) to compute Village fees (e.g., “valuation $28,000”).", 'bot');
+      }
+
+      const summary = summarize(address, zoning, intents, nums, valuation);
+      lastSummary = summary;
+      addMsg(render(summary), 'bot');
+      pdfBtn.disabled=false;
+    }
+
+    function askNow(){
+      const text=q.value.trim(); if(!text) return; addMsg(text,'me'); q.value=''; respond(text);
+    }
+
+    document.addEventListener('click', e=>{ if(e.target && e.target.classList.contains('ex')){ q.value=e.target.dataset.text; askNow(); }});
+    ask.addEventListener('click', askNow);
+    q.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); askNow(); }});
+    pdfBtn.addEventListener('click', ()=>{ if(!lastSummary) return; toPDF(lastSummary).save('PermitNow-Grafton-Summary.pdf'); });
+
+    loadData().then(()=> addMsg('Hi! Ask a Village of Grafton permit question. Include your address and **valuation** for best results.'));
   </script>
 </body>
 </html>
