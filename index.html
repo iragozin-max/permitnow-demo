@@ -113,6 +113,19 @@
     }
 
     loadData();
+    <script>
+  // Auto-post our document height to the parent (Squarespace) so the iframe resizes.
+  function postHeight() {
+    const h = document.documentElement.scrollHeight;
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'permitnow-height', value: h }, '*');
+    }
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  new MutationObserver(postHeight).observe(document.body, { subtree: true, childList: true, attributes: true });
+</script>
+
   </script>
 </body>
 </html>
